@@ -17,12 +17,14 @@ var ui tui.UI
 
 type uiChanel struct {
 	label    *tui.Label
-	messases *[]Message
+	messages []Message
 	history  *tui.Box
+	cursor   int
 }
 
 type historyWidget struct {
 	*tui.Box
+	historyBox *tui.Box
 
 	chanels []*uiChanel
 	active  int
@@ -30,30 +32,33 @@ type historyWidget struct {
 
 func (h *historyWidget) OnKeyEvent(ev tui.KeyEvent) {
 	switch ev.Key {
-	case tui.KeyTab, tui.KeyDown:
+	case tui.KeyTab:
 		h.Next()
-	case tui.KeyBacktab, tui.KeyUp:
+	case tui.KeyBacktab:
 		h.Prev()
 	}
 
 	h.Box.OnKeyEvent(ev)
 }
 
-func (h *historyWidget) SetHistory(history tui.Widget) {
-	h.Box.Remove(0)
-	h.Box.Append(history)
+func (h *historyWidget) SetChanel(chanel *uiChanel) {
+	h.historyBox.Remove(0)
+	historyScroll := tui.NewScrollArea(chanel.history)
+	historyScroll.SetAutoscrollToBottom(true)
+	h.historyBox.Append(historyScroll)
+	go h.PrintMessage(chanel.messages[0].text)
 }
 
 func (h *historyWidget) Next() {
 	h.active = clamp(h.active+1, 0, len(h.chanels)-1)
 	h.style()
-	h.SetHistory(h.chanels[h.active].history)
+	h.SetChanel(h.chanels[h.active])
 }
 
 func (h *historyWidget) Prev() {
 	h.active = clamp(h.active-1, 0, len(h.chanels)-1)
 	h.style()
-	h.SetHistory(h.chanels[h.active].history)
+	h.SetChanel(h.chanels[h.active])
 }
 
 func clamp(n, min, max int) int {
@@ -106,6 +111,7 @@ func newHistoryWidget(chanels ...*uiChanel) *historyWidget {
 	historyScroll.SetAutoscrollToBottom(true)
 	historyBox := tui.NewVBox(historyScroll)
 	historyBox.SetBorder(true)
+	view.historyBox = historyBox
 
 	input := tui.NewEntry()
 	input.SetFocused(true)
@@ -128,9 +134,7 @@ func newHistoryWidget(chanels ...*uiChanel) *historyWidget {
 		))
 		input.SetText("")
 	})
-	tui.NewHBox(sidebar, chat)
-
-	view.Box = historyBox
+	view.Box = tui.NewHBox(sidebar, chat)
 	view.style()
 
 	return view
@@ -138,8 +142,8 @@ func newHistoryWidget(chanels ...*uiChanel) *historyWidget {
 
 func main() {
 	historyLayout := newHistoryWidget(
-		&uiChanel{label: tui.NewLabel("#0. Пролог"), messases: &Intro, history: tui.NewVBox()},
-		&uiChanel{label: tui.NewLabel("#1. В доме приглушён огонь"), messases: &Test, history: tui.NewVBox()},
+		&uiChanel{label: tui.NewLabel("#0. Пролог"), messages: Intro, history: tui.NewVBox()},
+		&uiChanel{label: tui.NewLabel("#1. В доме приглушён огонь"), messages: Test, history: tui.NewVBox()},
 		// &uiChanel{label: tui.NewLabel("#2. Пробежавший лось"), messases: &Test, history: tui.NewVBox()},
 	)
 	var err error
@@ -153,6 +157,8 @@ func main() {
 	theme.SetStyle("label.chanel", tui.Style{Reverse: tui.DecorationOff})
 	theme.SetStyle("label.chanel-selected", tui.Style{Reverse: tui.DecorationOn, Fg: tui.ColorRed, Bg: tui.ColorWhite})
 	ui.SetTheme(theme)
+
+	go historyLayout.PrintMessage("Запуск!")
 
 	if err := ui.Run(); err != nil {
 		log.Fatal(err)

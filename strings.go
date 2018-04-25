@@ -16,12 +16,3 @@ var Test = []Message{
 	Message{100, "Тестовое сообщение."},
 	Message{100, "Второе тестовое сообщение."},
 }
-
-// func GetMessage(category string, position int) Message {
-// 	switch category {
-// 	case "intro":
-// 		return Intro[position]
-// 	default:
-// 		return Message{}
-// 	}
-// }
