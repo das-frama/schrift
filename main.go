@@ -46,7 +46,12 @@ func (h *historyWidget) SetChanel(chanel *uiChanel) {
 	historyScroll := tui.NewScrollArea(chanel.history)
 	historyScroll.SetAutoscrollToBottom(true)
 	h.historyBox.Append(historyScroll)
-	go h.PrintMessage(chanel.messages[0].text)
+
+	done := make(chan bool)
+	defer close(done)
+	for i := 0; i < len(chanel.messages); i++ {
+		go h.PrintMessage(chanel.messages[i], done)
+	}
 }
 
 func (h *historyWidget) Next() {
@@ -61,14 +66,21 @@ func (h *historyWidget) Prev() {
 	h.SetChanel(h.chanels[h.active])
 }
 
-func clamp(n, min, max int) int {
-	if n < min {
-		return max
+func (h *historyWidget) PrintMessage(message Message, done chan bool) {
+	textLabel := tui.NewLabel("")
+	// textLabel.SetWordWrap(true)
+	h.chanels[h.active].history.Append(tui.NewHBox(
+		tui.NewLabel(fmt.Sprintf("[%s]: ", myName)),
+		textLabel,
+		tui.NewSpacer(),
+	))
+	<-done
+	for _, s := range message.text {
+		textLabel.SetText(textLabel.Text() + string(s))
+		ui.Update(func() {})
+		time.Sleep(time.Duration(message.speed) * time.Millisecond)
 	}
-	if n > max {
-		return min
-	}
-	return n
+	done <- true
 }
 
 func (h *historyWidget) style() {
@@ -78,21 +90,6 @@ func (h *historyWidget) style() {
 			continue
 		}
 		h.chanels[i].label.SetStyleName("chanel")
-	}
-}
-
-func (h *historyWidget) PrintMessage(message string) {
-	textLabel := tui.NewLabel("")
-	// textLabel.SetWordWrap(true)
-	h.chanels[h.active].history.Append(tui.NewHBox(
-		tui.NewLabel(fmt.Sprintf("[%s]: ", myName)),
-		textLabel,
-		tui.NewSpacer(),
-	))
-	for _, s := range message {
-		textLabel.SetText(textLabel.Text() + string(s))
-		ui.Update(func() {})
-		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -158,9 +155,17 @@ func main() {
 	theme.SetStyle("label.chanel-selected", tui.Style{Reverse: tui.DecorationOn, Fg: tui.ColorRed, Bg: tui.ColorWhite})
 	ui.SetTheme(theme)
 
-	go historyLayout.PrintMessage("Запуск!")
-
 	if err := ui.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func clamp(n, min, max int) int {
+	if n < min {
+		return max
+	}
+	if n > max {
+		return min
+	}
+	return n
 }
