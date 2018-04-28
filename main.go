@@ -47,10 +47,35 @@ func (h *historyWidget) SetChanel(chanel *uiChanel) {
 	historyScroll.SetAutoscrollToBottom(true)
 	h.historyBox.Append(historyScroll)
 
-	done := make(chan bool)
-	defer close(done)
+	jobs := make(chan int, len(chanel.messages))
+	defer close(jobs)
+	go func() {
+		for i := 0; i < len(chanel.messages); i++ {
+			h.PrintMessage(chanel.messages[i], jobs)
+		}
+	}()
 	for i := 0; i < len(chanel.messages); i++ {
-		go h.PrintMessage(chanel.messages[i], done)
+		jobs <- i
+	}
+}
+
+func (h *historyWidget) PrintMessage(message Message, jobs chan int) {
+	_, more := <-jobs
+	if more {
+		textLabel := tui.NewLabel("")
+		// textLabel.SetSizePolicy(tui.Expanding, tui.Expanding)
+		// textLabel.SetWordWrap(true)
+		h.chanels[h.active].history.Append(tui.NewHBox(
+			tui.NewLabel(fmt.Sprintf("[%s]: ", myName)),
+			textLabel,
+			tui.NewSpacer(),
+		))
+		for _, s := range message.text {
+			ui.Update(func() {
+				textLabel.SetText(textLabel.Text() + string(s))
+			})
+			time.Sleep(time.Duration(message.speed) * time.Millisecond)
+		}
 	}
 }
 
@@ -64,23 +89,6 @@ func (h *historyWidget) Prev() {
 	h.active = clamp(h.active-1, 0, len(h.chanels)-1)
 	h.style()
 	h.SetChanel(h.chanels[h.active])
-}
-
-func (h *historyWidget) PrintMessage(message Message, done chan bool) {
-	textLabel := tui.NewLabel("")
-	// textLabel.SetWordWrap(true)
-	h.chanels[h.active].history.Append(tui.NewHBox(
-		tui.NewLabel(fmt.Sprintf("[%s]: ", myName)),
-		textLabel,
-		tui.NewSpacer(),
-	))
-	<-done
-	for _, s := range message.text {
-		textLabel.SetText(textLabel.Text() + string(s))
-		ui.Update(func() {})
-		time.Sleep(time.Duration(message.speed) * time.Millisecond)
-	}
-	done <- true
 }
 
 func (h *historyWidget) style() {
