@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	caret  = "$ "
-	myName = "frama"
+	caret     = "$ "
+	myName    = "frama"
+	animSpeed = 30
 )
 
 var ui tui.UI
@@ -48,7 +49,6 @@ func (h *historyWidget) SetChanel(chanel *uiChanel) {
 	h.historyBox.Append(historyScroll)
 
 	jobs := make(chan int, len(chanel.messages))
-	defer close(jobs)
 	go func() {
 		for i := 0; i < len(chanel.messages); i++ {
 			h.PrintMessage(chanel.messages[i], jobs)
@@ -57,11 +57,17 @@ func (h *historyWidget) SetChanel(chanel *uiChanel) {
 	for i := 0; i < len(chanel.messages); i++ {
 		jobs <- i
 	}
+	close(jobs)
 }
 
 func (h *historyWidget) PrintMessage(message Message, jobs chan int) {
 	_, more := <-jobs
 	if more {
+		// Задержка перед появлением сообщения.
+		if message.delay > 0 {
+			time.Sleep(time.Duration(message.delay) * time.Millisecond)
+		}
+
 		textLabel := tui.NewLabel("")
 		// textLabel.SetSizePolicy(tui.Expanding, tui.Expanding)
 		// textLabel.SetWordWrap(true)
@@ -74,7 +80,7 @@ func (h *historyWidget) PrintMessage(message Message, jobs chan int) {
 			ui.Update(func() {
 				textLabel.SetText(textLabel.Text() + string(s))
 			})
-			time.Sleep(time.Duration(message.speed) * time.Millisecond)
+			time.Sleep(time.Duration(animSpeed) * time.Millisecond)
 		}
 	}
 }
